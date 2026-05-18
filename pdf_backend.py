@@ -89,39 +89,3 @@ def pt_to_px(pt_value: float, dpi: int = 150) -> float:
 
 def px_to_pt(px_value: float, dpi: int = 150) -> float:
     return px_value * (72 / dpi)
-
-
-if __name__ == "__main__":
-    # Create test PDF
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((100, 100), "Internship Application Form", fontsize=20)
-    page.insert_text((100, 200), "Full Name: ____________________")
-    page.insert_text((100, 300), "Signature: ____________________")
-    doc.save("test.pdf")
-    doc.close()
-    print("test.pdf created!")
-
-    # Create test signature image
-    img = Image.new("RGBA", (300, 100), (255, 255, 255, 0))
-    from PIL import ImageDraw
-    draw = ImageDraw.Draw(img)
-    draw.text((10, 30), "John Doe", fill=(0, 0, 200, 255))
-    img.save("signature.png")
-    print("signature.png created!")
-
-    # Test load and page count
-    doc = load_pdf("test.pdf")
-    print(f"Page count: {get_page_count(doc)}")
-
-    # Test signature area detection
-    areas = find_signature_areas(doc, 0)
-    print(f"Signature areas found: {len(areas)}")
-    for a in areas:
-        print(f"  {a['reason']} -> x={a['x']:.1f}, y={a['y']:.1f}")
-
-    doc.close()
-
-    # Test place signature
-    output = place_signature("test.pdf", 0, 100, 290, "signature.png")
-    print(f"Signed PDF saved: {output}")
