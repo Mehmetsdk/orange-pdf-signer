@@ -127,7 +127,6 @@ Optional or image-processing-related dependencies may also be included depending
 
 ## Project Structure
 
-```text
 orange-pdf-signer/
 │
 ├── app.py
