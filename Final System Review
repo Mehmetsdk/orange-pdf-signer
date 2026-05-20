@@ -1,0 +1,95 @@
+## Final System Review
+
+The final version was tested using custom PDF files and PNG signature images to evaluate system functionality and integration.
+
+### Upload functionality
+
+PDF upload functionality works correctly.
+
+PNG signature upload also works correctly.
+
+The uploaded files are displayed properly inside the interface and processing starts without issues.
+
+### Signature processing
+
+Background removal functionality is partially working.
+
+Observed behavior during testing:
+
+- Background removal sometimes takes a long time.
+- In some cases the background becomes white instead of fully transparent.
+- Processing behavior is not always consistent.
+
+Opacity adjustment works correctly.
+
+Rotation functionality works correctly.
+
+Signature resizing functionality works correctly.
+
+Width and height adjustments update the signature size properly.
+
+### Placement system
+
+Placement functionality currently requires improvement.
+
+Auto-detection performs well initially and can identify signature areas correctly.
+
+However, resizing operations sometimes affect final placement quality and positioning becomes inconsistent.
+
+Manual placement currently does not work reliably and requires further improvement.
+
+Observed issue:
+
+- Signature positioning may shift from the intended placement area.
+
+### Frontend evaluation
+
+Frontend functionality works well overall.
+
+Verified functionality:
+
+- Interface loading
+- Theme colors
+- UI responsiveness
+- Loading behavior
+- Upload components
+- User controls
+
+The interface provides a clear workflow and functionality is organized in a user-friendly structure.
+
+### Export functionality
+
+The final signing workflow operates correctly.
+
+Verified functionality:
+
+- Signature insertion
+- Success notification display
+- Download button generation
+- Signed PDF export
+
+The signed document can be downloaded successfully after processing.
+
+### Overall assessment
+
+Core project functionality is operational.
+
+Working systems:
+
+- PDF upload
+- PNG upload
+- Interface controls
+- Rotation
+- Opacity
+- Signature size adjustment
+- PDF export
+- Frontend workflow
+
+Improvement opportunities:
+
+- Background removal consistency
+- Manual placement reliability
+- Placement accuracy after resizing
+- Auto-detection stability
+
+Overall, the project successfully implements the primary PDF signing workflow and provides a functional signing experience.
