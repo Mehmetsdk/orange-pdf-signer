@@ -459,9 +459,3 @@ License
 
 See the LICENSE file for project license information.
 
-
-Şimdi bunu eklemek için:
-
-```powershell id="bg41fa"
-cd "C:\Users\ASUS\Desktop\orange-pdf-signer-mehmet"
-notepad README.md
