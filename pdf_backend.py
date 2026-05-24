@@ -19,6 +19,9 @@ def get_page_count(doc: fitz.Document) -> int:
     return len(doc)
 
 
+def get_page_count(doc: fitz.Document) -> int:
+    return len(doc)
+
 def render_page(doc: fitz.Document, page_number: int, dpi: int = 150) -> Image.Image:
     page = doc[page_number]
     mat = fitz.Matrix(dpi / 72, dpi / 72)
@@ -255,6 +258,15 @@ def place_signature_image(
         max(1, int(height * 2)),
         preserve_aspect_ratio=preserve_aspect_ratio,
     )
+def place_signature(pdf_path, page_number, x, y, signature_img_path, width=150, height=60, output_path=None):
+    doc = fitz.open(pdf_path)
+    page = doc[page_number]
+
+    if not os.path.exists(signature_img_path):
+        raise FileNotFoundError(f"Signature image not found: {signature_img_path}")
+
+    sig_img = Image.open(signature_img_path).convert("RGBA")
+    sig_img = sig_img.resize((int(width * 2), int(height * 2)), Image.LANCZOS)
 
     img_bytes = io.BytesIO()
     sig_img.save(img_bytes, format="PNG")
