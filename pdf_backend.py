@@ -1,12 +1,13 @@
+import argparse
+import io
+import json
+import logging
+import os
+import re
+from typing import Dict, List, Optional
+
 import fitz  # PyMuPDF
 from PIL import Image
-import io
-import os
-import logging
-import argparse
-import json
-import re
-from typing import List, Dict, Optional
 
 SIGNATURE_KEYWORDS = [
     "signature", "imza", "sign here", "buraya imza",
@@ -22,7 +23,6 @@ def _validate_page_number(doc: fitz.Document, page_number: int) -> None:
 
 
 def _normalize_token(token: str) -> str:
-    # Normalize text for more robust keyword matching across punctuation/case variants.
     return re.sub(r"\W+", "", token.casefold())
 
 
@@ -98,17 +98,15 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
     page = doc[page_number]
     found: List[Dict[str, float]] = []
 
-    # WORD-BASED keyword detection (case-insensitive, handles multi-word keywords)
-    words = page.get_text("words")  # list of tuples (x0, y0, x1, y1, "word", block_no, line_no, word_no)
+    words = page.get_text("words")
     if words:
-        # sort by block/line/word to preserve reading order
         words_sorted = sorted(words, key=lambda w: (w[5], w[6], w[7]))
         tokens = [_normalize_token(w[4]) for w in words_sorted]
         rects = [(w[0], w[1], w[2], w[3]) for w in words_sorted]
 
         for keyword in SIGNATURE_KEYWORDS:
             parts = [_normalize_token(part) for part in keyword.split()]
-            parts = [p for p in parts if p]
+            parts = [part for part in parts if part]
             if not parts:
                 continue
             n = len(parts)
@@ -131,7 +129,6 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
                     }
                     found.append(area)
 
-    # Drawing-based detection (horizontal lines)
     paths = page.get_drawings()
     page_width = page.rect.width
     for path in paths:
@@ -141,7 +138,6 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
         width = rect.x1 - rect.x0
         height = rect.y1 - rect.y0
 
-        # line-like drawing: wide and very thin
         if width > page_width * 0.2 and height < 6:
             area = {
                 "x": rect.x0,
@@ -152,7 +148,6 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
             }
             found.append(area)
 
-    # Merge overlapping/nearby areas to reduce duplicates
     merged: List[Dict[str, float]] = []
     for a in found:
         ax0 = a["x"]
@@ -175,7 +170,6 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
             inter_h = max(0, min(ay1, my1) - max(ay0, my0))
             inter_area = inter_w * inter_h
             if inter_area > 0:
-                # merge by expanding bounding box
                 nx0 = min(ax0, mx0)
                 ny0 = min(ay0, my0)
                 nx1 = max(ax1, mx1)
@@ -191,7 +185,6 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
         if not merged_flag:
             merged.append(a)
 
-    # Clamp to page boundaries and discard invalid boxes.
     page_w = page.rect.width
     page_h = page.rect.height
     clamped: List[Dict[str, float]] = []
@@ -208,54 +201,72 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> List[Dict[str,
 
 def place_signature(
     pdf_path: str,
-    page_number: int,
-    x: float,
-    y: float,
+    page_no: int,
+    x_pt: float,
+    y_pt: float,
     signature_img_path: str,
-    width: float = 150,
-    height: float = 60,
+    width_pt: float = 150,
+    height_pt: float = 60,
+    preserve_aspect_ratio: bool = True,
     output_path: Optional[str] = None,
 ) -> str:
     """Insert a signature image into a PDF and save the result.
 
-    Keeps coordinates in PDF points. The signature image is resized to a
-    reasonable size and inserted into the given rectangle.
-    Returns the path to the saved PDF.
+    Coordinates and sizes are in PDF points. The image is inserted at the
+    requested top-left origin. If preserve_aspect_ratio is true, the image is
+    scaled to fit within the requested rectangle while keeping its ratio.
     """
     if not os.path.exists(pdf_path):
         raise FileNotFoundError(f"PDF not found: {pdf_path}")
-    if width <= 0 or height <= 0:
+    if width_pt <= 0 or height_pt <= 0:
         raise ValueError("width and height must be > 0")
-    if x < 0 or y < 0:
-        raise ValueError("x and y must be >= 0")
-
     if not os.path.exists(signature_img_path):
         raise FileNotFoundError(f"Signature image not found: {signature_img_path}")
-
-    with Image.open(signature_img_path) as source_img:
-        sig_img = source_img.convert("RGBA")
-    sig_img = sig_img.resize((int(width * 2), int(height * 2)), Image.LANCZOS)
-
-    img_bytes = io.BytesIO()
-    sig_img.save(img_bytes, format="PNG")
-    img_bytes.seek(0)
 
     if output_path is None:
         base, ext = os.path.splitext(pdf_path)
         output_path = f"{base}_signed{ext}"
 
+    with Image.open(signature_img_path) as source_img:
+        sig_img = source_img.convert("RGBA")
+
     doc = fitz.open(pdf_path)
     try:
-        _validate_page_number(doc, page_number)
-        page = doc[page_number]
+        _validate_page_number(doc, page_no)
+        page = doc[page_no]
         page_rect = page.rect
-        if x + width > page_rect.width or y + height > page_rect.height:
+        target_rect = fitz.Rect(x_pt, y_pt, x_pt + width_pt, y_pt + height_pt)
+        clipped_rect = target_rect & page_rect
+        if clipped_rect.is_empty:
             raise ValueError(
                 f"Signature rectangle out of page bounds: page=({page_rect.width:.2f},{page_rect.height:.2f}), "
-                f"rect=({x:.2f},{y:.2f},{width:.2f},{height:.2f})"
+                f"rect=({x_pt:.2f},{y_pt:.2f},{width_pt:.2f},{height_pt:.2f})"
             )
 
-        rect = fitz.Rect(x, y, x + width, y + height)
+        if preserve_aspect_ratio:
+            scale = min(clipped_rect.width / sig_img.width, clipped_rect.height / sig_img.height)
+            scaled_width = max(1, int(round(sig_img.width * scale)))
+            scaled_height = max(1, int(round(sig_img.height * scale)))
+            resized = sig_img.resize((scaled_width, scaled_height), Image.LANCZOS)
+            rect = fitz.Rect(
+                clipped_rect.x0,
+                clipped_rect.y0,
+                clipped_rect.x0 + scaled_width,
+                clipped_rect.y0 + scaled_height,
+            )
+        else:
+            resized = sig_img.resize(
+                (
+                    max(1, int(round(clipped_rect.width))),
+                    max(1, int(round(clipped_rect.height))),
+                ),
+                Image.LANCZOS,
+            )
+            rect = clipped_rect
+
+        img_bytes = io.BytesIO()
+        resized.save(img_bytes, format="PNG")
+        img_bytes.seek(0)
         page.insert_image(rect, stream=img_bytes.read(), overlay=True)
         doc.save(output_path)
     finally:
@@ -263,9 +274,6 @@ def place_signature(
 
     logger.info("Saved signed PDF to %s", output_path)
     return output_path
-
-
-
 
 
 def _print_json(obj: object) -> None:
@@ -288,7 +296,9 @@ def main() -> None:
     p_place.add_argument("image", help="Signature image path")
     p_place.add_argument("--width", type=float, default=150.0, help="Width in points")
     p_place.add_argument("--height", type=float, default=60.0, help="Height in points")
+    p_place.add_argument("--no-preserve-aspect-ratio", dest="preserve_aspect_ratio", action="store_false")
     p_place.add_argument("--output", help="Output PDF path")
+    p_place.set_defaults(preserve_aspect_ratio=True)
 
     p_convert = sub.add_parser("convert", help="Convert between PDF points and pixels")
     p_convert.add_argument("value", type=float, help="Numeric value to convert")
@@ -313,12 +323,13 @@ def main() -> None:
     elif args.command == "place":
         out = place_signature(
             args.pdf,
-            args.page,
-            args.x,
-            args.y,
-            args.image,
-            width=args.width,
-            height=args.height,
+            page_no=args.page,
+            x_pt=args.x,
+            y_pt=args.y,
+            signature_img_path=args.image,
+            width_pt=args.width,
+            height_pt=args.height,
+            preserve_aspect_ratio=args.preserve_aspect_ratio,
             output_path=args.output,
         )
         print(out)
@@ -337,4 +348,3 @@ def main() -> None:
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     main()
-

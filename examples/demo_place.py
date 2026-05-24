@@ -30,10 +30,18 @@ def place_and_preview(pdf_path: str, page: int, sig_img: str, out_pdf: str, out_
     w = a["w"]
     h = a["h"]
 
-    # Slightly reduce size so image fits nicely over the area.
-    out_pdf_path = place_signature(pdf_path, page, x, y, sig_img, width=w * 0.9, height=h * 0.9, output_path=out_pdf)
+    out_pdf_path = place_signature(
+        pdf_path,
+        page_no=page,
+        x_pt=x,
+        y_pt=y,
+        signature_img_path=sig_img,
+        width_pt=w * 0.9,
+        height_pt=h * 0.9,
+        preserve_aspect_ratio=True,
+        output_path=out_pdf,
+    )
 
-    # Render preview.
     doc2 = load_pdf(out_pdf_path)
     try:
         img = render_page(doc2, page, dpi=150)
