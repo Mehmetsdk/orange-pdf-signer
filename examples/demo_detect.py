@@ -28,6 +28,12 @@ def draw_areas(pdf_path: str, page: int, out_image: str, dpi: int = 150) -> None
             y = px["y"]
             w = px["w"]
             h = px["h"]
+        scale = dpi / 72.0
+        for a in areas:
+            x = a["x"] * scale
+            y = a["y"] * scale
+            w = a["w"] * scale
+            h = a["h"] * scale
             draw.rectangle([x, y, x + w, y + h], outline=(255, 0, 0, 200), width=3)
 
         img.save(out_image)
