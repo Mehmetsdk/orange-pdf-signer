@@ -13,20 +13,23 @@ from PIL import ImageDraw
 
 def draw_areas(pdf_path: str, page: int, out_image: str, dpi: int = 150) -> None:
     doc = load_pdf(pdf_path)
-    areas = find_signature_areas(doc, page)
-    img = render_page(doc, page, dpi=dpi).convert("RGBA")
-    draw = ImageDraw.Draw(img)
+    try:
+        areas = find_signature_areas(doc, page)
+        img = render_page(doc, page, dpi=dpi).convert("RGBA")
+        draw = ImageDraw.Draw(img)
 
-    scale = dpi / 72.0
-    for a in areas:
-        x = a["x"] * scale
-        y_top = (a["y"] - a["h"]) * scale
-        w = a["w"] * scale
-        h = a["h"] * scale
-        draw.rectangle([x, y_top, x + w, y_top + h], outline=(255, 0, 0, 200), width=3)
+        scale = dpi / 72.0
+        for a in areas:
+            x = a["x"] * scale
+            y = a["y"] * scale
+            w = a["w"] * scale
+            h = a["h"] * scale
+            draw.rectangle([x, y, x + w, y + h], outline=(255, 0, 0, 200), width=3)
 
-    img.save(out_image)
-    print("Saved debug image:", out_image)
+        img.save(out_image)
+        print("Saved debug image:", out_image)
+    finally:
+        doc.close()
 
 
 def main(argv):

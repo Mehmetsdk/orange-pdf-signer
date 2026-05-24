@@ -1,0 +1,6 @@
+streamlit
+streamlit-image-coordinates
+PyMuPDF
+Pillow
+rembg
+pytest
