@@ -7,26 +7,33 @@ This will load page 0 of input.pdf, detect probable signature areas and
 save a rendered page with red rectangles drawn around detected areas.
 """
 import sys
-from pdf_backend import load_pdf, find_signature_areas, render_page
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from pdf_backend import load_pdf, find_signature_areas, render_page, rect_points_to_pixels
 from PIL import ImageDraw
 
 
 def draw_areas(pdf_path: str, page: int, out_image: str, dpi: int = 150) -> None:
     doc = load_pdf(pdf_path)
-    areas = find_signature_areas(doc, page)
-    img = render_page(doc, page, dpi=dpi).convert("RGBA")
-    draw = ImageDraw.Draw(img)
+    try:
+        areas = find_signature_areas(doc, page)
+        img = render_page(doc, page, dpi=dpi).convert("RGBA")
+        draw = ImageDraw.Draw(img)
 
-    scale = dpi / 72.0
-    for a in areas:
-        x = a["x"] * scale
-        y_top = (a["y"] - a["h"]) * scale
-        w = a["w"] * scale
-        h = a["h"] * scale
-        draw.rectangle([x, y_top, x + w, y_top + h], outline=(255, 0, 0, 200), width=3)
+        for a in areas:
+            px = rect_points_to_pixels(a, dpi)
+            x = px["x"]
+            y = px["y"]
+            w = px["w"]
+            h = px["h"]
+            draw.rectangle([x, y, x + w, y + h], outline=(255, 0, 0, 200), width=3)
 
-    img.save(out_image)
-    print("Saved debug image:", out_image)
+        img.save(out_image)
+        print("Saved debug image:", out_image)
+    finally:
+        doc.close()
 
 
 def main(argv):
