@@ -31,8 +31,8 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> list:
         instances = page.search_for(keyword)
         for rect in instances:
             area = {
-                "x": rect.x0,
-                "y": rect.y1 + 2,
+                "x": rect.x0 + 60,
+                "y": rect.y0 - 45,
                 "w": max(rect.width * 3, 150),
                 "h": 40,
                 "reason": f"Keyword match: '{keyword}'"
@@ -49,7 +49,7 @@ def find_signature_areas(doc: fitz.Document, page_number: int) -> list:
 
         if width > page_width * 0.2 and height < 5:
             area = {
-                "x": rect.x0,
+                "x": rect.x0 + 60,
                 "y": rect.y0 - 35,
                 "w": width,
                 "h": 35,
