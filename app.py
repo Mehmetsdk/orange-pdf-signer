@@ -211,6 +211,9 @@ section[data-testid="stSidebar"] .block-container {
 .stSlider [data-testid="stTickBarMin"],
 .stSlider [data-testid="stTickBarMax"] {
     display: none !important;
+visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -312,7 +315,7 @@ with st.sidebar:
         st.markdown('<span class="sidebar-label">Signature</span>', unsafe_allow_html=True)
         thumb = st.session_state.sig_img.copy().convert("RGBA")
         thumb.thumbnail((220, 90))
-        bg = Image.new("RGB", thumb.size, (17, 17, 17))
+        bg = Image.new("RGB", thumb.size, (255, 255, 255))
         bg.paste(thumb, mask=thumb.split()[3])
         st.image(bg, use_container_width=True)
 
