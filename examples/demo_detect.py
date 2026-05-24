@@ -7,7 +7,11 @@ This will load page 0 of input.pdf, detect probable signature areas and
 save a rendered page with red rectangles drawn around detected areas.
 """
 import sys
-from pdf_backend import load_pdf, find_signature_areas, render_page
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from pdf_backend import load_pdf, find_signature_areas, render_page, rect_points_to_pixels
 from PIL import ImageDraw
 
 
@@ -18,6 +22,12 @@ def draw_areas(pdf_path: str, page: int, out_image: str, dpi: int = 150) -> None
         img = render_page(doc, page, dpi=dpi).convert("RGBA")
         draw = ImageDraw.Draw(img)
 
+        for a in areas:
+            px = rect_points_to_pixels(a, dpi)
+            x = px["x"]
+            y = px["y"]
+            w = px["w"]
+            h = px["h"]
         scale = dpi / 72.0
         for a in areas:
             x = a["x"] * scale
