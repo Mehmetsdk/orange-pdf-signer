@@ -1,461 +1,207 @@
-# Orange PDF Signer
+# PDF Signer
 
-A Streamlit-based PDF signing application that allows users to upload a PDF, upload a signature image, preview the document, and place the signature either automatically or manually.
+A web-based PDF signing tool built with Python and Streamlit. Upload a PDF, upload your signature image, and place it precisely — automatically or manually.
 
-The project focuses on making PDF signing simple and visual. Instead of forcing users to guess X/Y coordinates, the app supports mouse-based manual placement on a clickable PDF preview. Users can still fine-tune the final position with numeric coordinate inputs.
+![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.x-red?style=flat-square&logo=streamlit)
+![PyMuPDF](https://img.shields.io/badge/PyMuPDF-latest-green?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
 ---
 
 ## Features
 
-### PDF Upload
-
-Users can upload a PDF file directly from the Streamlit interface.
-
-The app renders the selected PDF page as an image preview so the user can see where the signature will be placed before exporting the final signed document.
-
----
-
-### Signature Image Upload
-
-Users can upload a signature image file.
-
-Supported image formats depend on Pillow support, but common formats such as PNG and JPG/JPEG are expected to work.
-
-The app processes the uploaded signature before inserting it into the PDF.
-
----
-
-### Manual Mouse-Based Signature Placement
-
-The main feature of this version is visual manual placement.
-
-Instead of only entering X/Y coordinates, users can click directly on the PDF preview to place the signature.
-
-The clicked point is treated as the center of the signature. The app then converts the clicked preview coordinates into real PDF coordinates and updates the signature position.
-
-This makes the manual signing flow much easier:
-
-1. Upload a PDF.
-2. Upload a signature image.
-3. Select manual placement.
-4. Click on the PDF preview.
-5. Fine-tune with X/Y controls if needed.
-6. Download the signed PDF.
-
----
-
-### X/Y Coordinate Fine-Tuning
-
-Manual X/Y coordinate inputs are still available.
-
-This is useful when the user wants more precise control after clicking on the preview.
-
-The coordinate inputs act as a fallback and fine-tuning mechanism.
-
----
-
-### Automatic Signature Detection
-
-The app also includes an automatic placement mode.
-
-The backend can search for likely signature areas using simple detection logic such as signature-related text or visual placement hints.
-
-This mode is useful when the PDF already contains clear signing areas.
-
-Manual mode is still available when automatic detection is not accurate enough.
-
----
-
-### Signature Styling Options
-
-The app includes helper logic for preparing the signature image before inserting it into the PDF.
-
-Depending on the current UI options and backend functions, the signature can support:
-
-- Resizing
-- Opacity adjustment
-- Rotation
-- Transparent background handling
-- Trimming unnecessary transparent margins
-- Placement inside the PDF page bounds
-
-These options help make the inserted signature look cleaner and more natural.
-
----
-
-### PDF Preview
-
-Before downloading the final PDF, the user can preview the selected page with the signature applied.
-
-The preview is important because PDF coordinate systems and screen preview sizes are different.
-
-The app handles the conversion between:
-
-- displayed preview pixels
-- internally rendered image pixels
-- PDF points
-
-This helps keep the preview position and the exported PDF position consistent.
-
----
-
-### Export Signed PDF
-
-After placement is confirmed, the app generates a signed PDF file.
-
-The final output keeps the original PDF content and inserts the processed signature image at the selected location.
-
-The user can then download the signed document from the Streamlit interface.
+| Feature | Description |
+|---|---|
+| **Auto-detect** | Scans the PDF for signature keywords and underlines, places the signature automatically |
+| **Manual placement** | Click anywhere on the PDF preview to position the signature |
+| **Nudge controls** | Fine-tune position with arrow buttons (5pt steps) |
+| **Background removal** | Remove white/light backgrounds from the signature image (Pillow fallback or rembg AI) |
+| **Opacity & rotation** | Adjust signature transparency and angle |
+| **Session persistence** | Last uploaded PDF and signature are restored automatically after page refresh |
+| **Live preview** | See exactly how the signed PDF will look before downloading |
+| **Download** | Export the signed document as a PDF file |
 
 ---
 
 ## Tech Stack
 
-The project uses:
-
-- Python
-- Streamlit
-- PyMuPDF
-- Pillow
-- streamlit-image-coordinates
-- pytest
-
-Optional or image-processing-related dependencies may also be included depending on the current implementation.
+- **[Streamlit](https://streamlit.io/)** — Web interface
+- **[PyMuPDF (fitz)](https://pymupdf.readthedocs.io/)** — PDF rendering and signature embedding
+- **[Pillow](https://pillow.readthedocs.io/)** — Image processing
+- **[streamlit-image-coordinates](https://github.com/blackary/streamlit-image-coordinates)** — Click-to-place on PDF preview
+- **[rembg](https://github.com/danielgatis/rembg)** *(optional)* — AI-based background removal
 
 ---
 
 ## Project Structure
 
+```
 orange-pdf-signer/
-│
-├── app.py
-│   └── Streamlit user interface.
-│       Handles file upload, preview, manual placement UI, and download flow.
-│
-├── pdf_backend.py
-│   └── Backend PDF and image-processing logic.
-│       Handles PDF rendering, signature processing, coordinate conversion,
-│       placement, and signed PDF generation.
-│
-├── requirements.txt
-│   └── Python dependencies required to run the app and tests.
-│
+├── app.py                  # Streamlit UI — upload, preview, placement, download
+├── pdf_backend.py          # Backend — PDF processing, signature detection & placement
+├── requirements.txt        # Python dependencies
+├── .streamlit/
+│   └── config.toml         # Theme configuration (dark mode)
 ├── tests/
-│   └── Backend tests for helper functions and placement logic.
-│
+│   └── test_pdf_backend.py # Unit tests for backend functions
 ├── examples/
-│   └── Example/demo scripts from the original repository.
-│
-├── PR_NOTE.md
-│   └── Project or pull request notes.
-│
-├── LICENSE
-│   └── License file.
-│
-└── .gitignore
-    └── Prevents local environment/cache files from being committed.
-Installation
-1. Clone the repository
+│   ├── demo_detect.py      # Auto-detect demo script
+│   ├── demo_place.py       # Placement demo script
+│   └── make_sample.py      # Sample PDF generator
+└── uploads/                # Local session storage (gitignored)
+```
+
+---
+
+## Getting Started
+
+### 1. Clone the repository
+
+```bash
 git clone https://github.com/Mehmetsdk/orange-pdf-signer.git
 cd orange-pdf-signer
+```
 
-If you are working on a feature branch:
+### 2. Create a virtual environment
 
-git checkout -b your-branch-name
-
-Example:
-
-git checkout -b CanKOKSAL-manual-signature-placement
-2. Create a virtual environment
-
-On Windows PowerShell:
-
+**Windows:**
+```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+```
 
-If PowerShell blocks activation, run:
+> If PowerShell blocks activation: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
 
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-Then activate again:
-
-.\.venv\Scripts\Activate.ps1
-
-On macOS/Linux:
-
+**macOS / Linux:**
+```bash
 python -m venv .venv
 source .venv/bin/activate
-3. Install dependencies
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
 
-If needed, upgrade pip first:
+> **Note:** `rembg` requires an ONNX runtime for AI background removal. If not installed, the app falls back to Pillow-based removal automatically.
+> ```bash
+> pip install "rembg[cpu]"   # optional — for AI background removal
+> ```
 
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-Running the Application
+### 4. Run the app
 
-Start the Streamlit app:
-
-streamlit run app.py
-
-If the streamlit command is not recognized:
-
+```bash
 python -m streamlit run app.py
+```
 
-After running the command, Streamlit will show a local URL in the terminal.
+Open [http://localhost:8501](http://localhost:8501) in your browser.
 
-Usually it looks like:
+---
 
-http://localhost:8501
+## How to Use
 
-Open that link in your browser.
+### Auto-detect mode
+1. Upload your PDF from the sidebar
+2. Upload your signature image
+3. Select **Auto-detect** placement mode
+4. The app finds signature areas (keywords like "Signature:" and underlines)
+5. Select the detected area and click **Sign & Download PDF**
 
-How to Use
-Basic Signing Flow
-Start the app.
-Upload a PDF file.
-Upload a signature image.
-Select the PDF page you want to preview/sign.
-Choose the placement mode.
-Adjust signature size, opacity, rotation, or other available settings.
-Preview the result.
-Download the signed PDF.
-Manual Placement Flow
+### Manual mode
+1. Upload your PDF and signature image
+2. Select **Manual** placement mode
+3. Click on the PDF preview to place the signature
+4. Fine-tune with X/Y inputs or nudge buttons (← → ↑ ↓)
+5. Click **Sign & Download PDF**
 
-Manual placement is designed for visual control.
+### Signature processing options
+| Option | Description |
+|---|---|
+| Remove background | Makes white/light pixels transparent |
+| Opacity | Controls signature transparency (0.10 – 1.00) |
+| Rotation | Rotates the signature (−45° to +45°) |
+| Trim empty edges | Crops transparent margins automatically |
+| Preserve aspect ratio | Keeps the signature proportions when resizing |
 
-Choose manual placement mode.
-Click directly on the PDF preview.
-The app places the signature around the clicked point.
-Use X/Y coordinate inputs for small adjustments.
-Download the final signed PDF.
+---
 
-The clicked point is interpreted as the center of the signature.
+## Auto-detect Algorithm
 
-This means that if the user clicks the middle of a signature box, the signature should be centered around that location.
+The detection engine uses a two-pass approach:
 
-Automatic Placement Flow
+1. **Drawn lines** — Detects horizontal lines from PDF vector drawings
+2. **Text underlines** — Detects underscore sequences (`___`) used as signature fields
+3. **Keyword matching** — Searches for terms like `Signature`, `Sign here`, `İmza`, etc.
 
-Automatic placement attempts to find a likely signing area in the document.
+When a keyword and a line are found on the same row, the signature is placed **directly above the line**. Keyword-only matches place the signature to the right of the text.
 
-This may rely on text or visual cues inside the PDF.
+---
 
-Examples of possible signing hints:
+## Coordinate System
 
-“Signature”
-“Sign here”
-“Signed by”
-Signature lines
-Other signing-related markers
+PDF coordinates and screen pixels are different. The app handles all conversions internally:
 
-Automatic detection may not always be perfect, especially on complex PDF layouts. In those cases, manual placement should be used.
+```
+Browser click (px)
+    → Scaled to rendered image (px)
+    → Converted to PDF points (pt)
+    → Centered on click position
+    → Clamped to page boundaries
+    → Applied to preview & exported PDF
+```
 
-Coordinate System Explanation
+1 PDF point = 1/72 inch. All placements use PDF points internally.
 
-PDF placement can be confusing because the app deals with several coordinate systems.
+---
 
-The main systems are:
+## Running Tests
 
-1. Displayed Preview Coordinates
-
-These are the coordinates from the image shown in the browser.
-
-The preview may be resized for display.
-
-For example, the actual rendered PDF page may be much larger than the image shown in Streamlit.
-
-2. Rendered Image Pixel Coordinates
-
-The PDF page is rendered internally as an image.
-
-This rendered image has its own pixel dimensions.
-
-The displayed preview click must first be scaled back to the rendered image size.
-
-3. PDF Point Coordinates
-
-PDFs use points.
-
-One PDF point is equal to 1/72 inch.
-
-The final signature must be placed using PDF point coordinates, not browser pixels.
-
-Coordinate Conversion Flow
-
-When the user clicks the preview:
-
-display click position
-        ↓
-scaled to rendered image pixels
-        ↓
-converted to PDF points
-        ↓
-adjusted so clicked point becomes signature center
-        ↓
-clamped inside page boundaries
-        ↓
-used for preview and final PDF export
-
-This conversion is necessary so that the preview and the downloaded signed PDF match.
-
-Signature Bounds Handling
-
-The signature should not be placed outside the PDF page.
-
-The app should clamp placement values so that:
-
-x >= 0
-y >= 0
-x + signature_width <= page_width
-y + signature_height <= page_height
-
-This prevents the signature from disappearing outside the visible document area.
-
-Testing
-
-Run the test suite:
-
+```bash
 pytest -q
+```
 
-If pytest is not recognized:
+Tests cover coordinate conversion, placement clamping, signature processing, and PDF helper functions.
 
-python -m pytest -q
+---
 
-Tests are used to verify backend behavior such as:
+## Team
 
-coordinate conversion
-placement calculations
-signature boundary clamping
-image/PDF helper functions
-Manual Testing Checklist
+| Name | Role |
+|---|---|
+| **Mehmet** | Backend — PDF processing, auto-detect, coordinate system |
+| **Aysel** | UI — Streamlit interface, file validation, user flow |
+| **Can** | Signature processing — background removal, opacity, rotation |
+| **Sami** | Testing & integration — test suite, QA, merging |
 
-Before opening or merging a pull request, test the app manually.
+---
 
-App Startup
- pip install -r requirements.txt works.
- streamlit run app.py starts the app.
- The app opens in the browser.
-Upload Flow
- A PDF can be uploaded.
- A signature image can be uploaded.
- The selected PDF page is previewed.
-Manual Placement
- Manual mode is available.
- Clicking the PDF preview moves the signature.
- The clicked point behaves like the center of the signature.
- X/Y inputs still work.
- The signature cannot be moved outside the page.
- The preview updates correctly after placement changes.
-Export
- The signed PDF can be downloaded.
- The downloaded PDF matches the preview placement.
- The original PDF content is preserved.
- The signature appears clearly.
-Automatic Placement
- Auto-detect mode still works.
- Manual mode still works even if auto-detect fails or is inaccurate.
-Development Notes
-Do not commit local environment files
+## Troubleshooting
 
-The following should not be committed:
-
-.venv/
-__pycache__/
-.pytest_cache/
-*.pyc
-
-These are local development/cache files and should stay out of Git.
-
-Recommended Git Workflow
-
-Create a branch for your feature:
-
-git checkout -b CanKOKSAL-manual-signature-placement
-
-After making changes:
-
-git status
-git add app.py pdf_backend.py requirements.txt tests/ .gitignore README.md
-git commit -m "Add mouse-based manual signature placement"
-git push -u origin CanKOKSAL-manual-signature-placement
-
-Then open a pull request on GitHub.
-
-Pull Request Notes
-
-A good pull request description should explain:
-
-what feature was added
-why it was needed
-which files were changed
-how reviewers can test it
-any important coordinate or placement details
-
-For this project, reviewers should especially check that:
-
-preview placement matches final PDF placement
-click-to-place behavior works correctly
-X/Y fine-tuning still works
-automatic placement was not broken
-Troubleshooting
-streamlit command not found
-
-Use:
-
+**`streamlit` command not found**
+```bash
 python -m streamlit run app.py
-PowerShell cannot activate virtual environment
+```
 
-Run:
-
+**PowerShell won't activate the virtual environment**
+```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-Then:
-
 .\.venv\Scripts\Activate.ps1
-Package installation fails
+```
 
-Upgrade pip:
+**Signature appears in the wrong position in the downloaded PDF**
+This is usually a coordinate mismatch. Make sure the preview width (`DISPLAY_WIDTH`) and rendered image dimensions are passed correctly to `display_click_to_signature_top_left_pt()`.
 
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+**rembg background removal not working**
+Install rembg with CPU support:
+```bash
+pip install "rembg[cpu]"
+```
+Without it, the app automatically uses Pillow-based background removal.
 
-If an image-processing dependency causes issues, check whether the app can still run with the core dependencies installed.
+---
 
-Signature appears in a different place in the downloaded PDF
+## License
 
-This usually means there is a coordinate conversion mismatch.
-
-Check the conversion between:
-
-display preview pixels
-rendered image pixels
-PDF points
-
-Also verify that the preview width and rendered image dimensions are used correctly when converting click coordinates.
-
-Signature goes outside the page
-
-Check the clamping logic.
-
-The final X/Y values should be limited so the signature rectangle stays inside the PDF page boundaries.
-
-Future Improvements
-
-Possible improvements for later versions:
-
-Drag-and-drop signature movement instead of click-to-place only
-Multiple signatures per PDF
-Support for initials
-Text/date stamping
-Multi-page signing
-Better automatic detection
-Signature presets
-Save recent signature settings
-Add undo/reset placement controls
-Improved UI layout and preview zoom
-More detailed test coverage for PDF edge cases
-License
-
-See the LICENSE file for project license information.
-
+See [LICENSE](LICENSE) for details.
