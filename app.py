@@ -10,7 +10,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 from pdf_backend import (
     render_page,
     find_signature_areas,
-    place_signature_image,
+    place_signature,
     pt_to_px,
     get_page_count,
     process_signature_image,
@@ -102,20 +102,24 @@ def place_signature_from_bytes(
     sig_img,
     width_pt=150,
     height_pt=60,
+    preserve_aspect_ratio=True,
 ):
     with tempfile.TemporaryDirectory() as tmp:
         pdf_path = os.path.join(tmp, "input.pdf")
+        sig_path = os.path.join(tmp, "signature.png")
         out_path = os.path.join(tmp, "signed.pdf")
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
-        place_signature_image(
+        sig_img.convert("RGBA").save(sig_path)
+        place_signature(
             pdf_path,
             page_number,
             x_pt,
             y_pt,
-            sig_img,
+            sig_path,
             width=width_pt,
             height=height_pt,
+            preserve_aspect_ratio=preserve_aspect_ratio,
             output_path=out_path,
         )
         with open(out_path, "rb") as f:
@@ -329,6 +333,7 @@ with col_main:
                             processed_sig,
                             w_pt,
                             h_pt,
+                            preserve_aspect_ratio=preserve,
                         )
                     st.markdown('<div class="success-box">✔ Signature added!</div>', unsafe_allow_html=True)
                     st.download_button(
@@ -462,6 +467,7 @@ with col_main:
                         processed_sig,
                         w_pt,
                         h_pt,
+                        preserve_aspect_ratio=preserve,
                     )
                 st.markdown('<div class="success-box">✔ Signature added!</div>', unsafe_allow_html=True)
                 st.download_button(

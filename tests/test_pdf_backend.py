@@ -1,9 +1,13 @@
+from pathlib import Path
+
+import fitz
 from PIL import Image
 
 from pdf_backend import (
     apply_opacity,
     clamp_signature_position,
     click_center_to_signature_top_left_pt,
+    place_signature_image,
     process_signature_image,
     remove_light_background_pillow,
     resize_signature_to_box,
@@ -57,6 +61,46 @@ def test_resize_signature_to_box_exact_size():
     out = resize_signature_to_box(img, 100, 60, preserve_aspect_ratio=True)
     assert out.size == (100, 60)
     assert out.mode == "RGBA"
+
+
+def test_resize_signature_to_box_preserves_aspect_with_padding():
+    img = Image.new("RGBA", (80, 20), (255, 0, 0, 255))
+    out = resize_signature_to_box(img, 100, 60, preserve_aspect_ratio=True)
+    assert out.size == (100, 60)
+    assert out.getpixel((0, 0))[3] == 0
+    assert out.getpixel((50, 30))[0:3] == (255, 0, 0)
+
+
+def test_place_signature_image_preserves_aspect_ratio_in_pdf(tmp_path: Path):
+    pdf_path = tmp_path / "input.pdf"
+    output_path = tmp_path / "signed.pdf"
+
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=200)
+    page.insert_text((20, 20), "Test PDF")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    sig = Image.new("RGBA", (80, 20), (255, 0, 0, 255))
+    place_signature_image(
+        str(pdf_path),
+        0,
+        50,
+        80,
+        sig,
+        width=100,
+        height=60,
+        preserve_aspect_ratio=True,
+        output_path=str(output_path),
+    )
+
+    signed = fitz.open(str(output_path))
+    rendered = signed[0].get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
+    preview = Image.frombytes("RGB", [rendered.width, rendered.height], rendered.samples)
+
+    assert preview.getpixel((55, 85)) == (255, 0, 0)
+    assert preview.getpixel((95, 85)) != (255, 0, 0)
+    signed.close()
 
 
 def test_click_center_to_signature_top_left_subtracts_half_size():

@@ -215,14 +215,22 @@ def place_signature(
     signature_img_path,
     width=150,
     height=60,
+    preserve_aspect_ratio=True,
     output_path=None,
 ):
     if not os.path.exists(signature_img_path):
         raise FileNotFoundError(f"Signature image not found: {signature_img_path}")
     sig_img = Image.open(signature_img_path).convert("RGBA")
     return place_signature_image(
-        pdf_path, page_number, x, y, sig_img,
-        width=width, height=height, output_path=output_path,
+        pdf_path,
+        page_number,
+        x,
+        y,
+        sig_img,
+        width=width,
+        height=height,
+        preserve_aspect_ratio=preserve_aspect_ratio,
+        output_path=output_path,
     )
 
 
@@ -234,16 +242,18 @@ def place_signature_image(
     signature_image: Image.Image,
     width=150,
     height=60,
+    preserve_aspect_ratio=True,
     output_path=None,
 ):
     """Insert a PIL RGBA signature into a PDF page; PNG alpha is preserved."""
     doc = fitz.open(pdf_path)
     page = doc[page_number]
 
-    sig_img = signature_image.convert("RGBA")
-    sig_img = sig_img.resize(
-        (max(1, int(width * 2)), max(1, int(height * 2))),
-        Image.LANCZOS,
+    sig_img = resize_signature_to_box(
+        signature_image,
+        max(1, int(width * 2)),
+        max(1, int(height * 2)),
+        preserve_aspect_ratio=preserve_aspect_ratio,
     )
 
     img_bytes = io.BytesIO()

@@ -1,16 +1,19 @@
-This pull request updates the PDF backend processing logic and adds a
-small demo script to visualize detected signature areas.
+This pull request prepares the PDF Signer project for handoff to Mehmet.
+It keeps the backend as the source of truth for PDF placement and aligns the
+UI/demo flow with Mehmet's backend API.
 
 What was added
 
-- Improved `find_signature_areas` with word-based, case-insensitive
-  keyword detection and horizontal-line detection.
-- Merging of overlapping detection boxes to reduce duplicates.
-- CLI helpers and JSON output for detection results.
-- `examples/demo_detect.py` to render a page and draw detection boxes.
+- Improved backend helpers for signature placement and coordinate handling.
+- `place_signature()` is now the integration point for PDF output.
+- The Streamlit UI passes the processed signature through Mehmet's backend.
+- `examples/demo_detect.py` now draws detected signature areas correctly.
+- Regression tests cover image processing and PDF placement behavior.
 
 Notes
 
-- Resolved a merge conflict with `origin/main` by keeping the improved
-  backend implementation (merge performed locally and pushed).
-- To test locally, run `python examples/demo_detect.py <pdf> <page> out.png`.
+- Mehmet owns `pdf_backend.py` and the example scripts.
+- Aysel owns `app.py` and the UI wiring.
+- Can owns signature-image processing only.
+- To test locally, run `python examples/demo_detect.py <pdf> <page> out.png`
+  and `python -m pytest -q` if pytest is installed in the environment.
