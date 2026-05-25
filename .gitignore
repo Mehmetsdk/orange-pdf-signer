@@ -2,3 +2,5 @@
 *.pyc
 .venv/
 .pytest_cache/
+uploads/
+*.lnk
