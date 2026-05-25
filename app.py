@@ -5,6 +5,7 @@ import io
 import tempfile
 import os
 import json
+import shutil
 from pathlib import Path
 from datetime import datetime
 
@@ -24,7 +25,6 @@ from pdf_backend import (
     display_click_to_signature_top_left_pt,
 )
 
-# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="PDF Signer", page_icon="✍️", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
@@ -69,7 +69,6 @@ button[kind="headerNoPadding"], [data-testid="collapsedControl"] { display: flex
 </style>
 """, unsafe_allow_html=True)
 
-# ── Local storage ─────────────────────────────────────────────────────────────
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 LAST_PDF_PATH  = UPLOAD_DIR / "last_pdf.pdf"
@@ -77,9 +76,7 @@ LAST_SIG_PATH  = UPLOAD_DIR / "last_signature.png"
 META_PATH      = UPLOAD_DIR / "meta.json"
 
 
-def save_session(pdf_bytes: bytes | None = None, sig_img: Image.Image | None = None,
-                 pdf_name: str = "", sig_name: str = "") -> None:
-    """Yüklenen dosyaları diske kaydet."""
+def save_session(pdf_bytes=None, sig_img=None, pdf_name="", sig_name=""):
     meta = json.loads(META_PATH.read_text()) if META_PATH.exists() else {}
     if pdf_bytes is not None:
         LAST_PDF_PATH.write_bytes(pdf_bytes)
@@ -92,8 +89,16 @@ def save_session(pdf_bytes: bytes | None = None, sig_img: Image.Image | None = N
     META_PATH.write_text(json.dumps(meta, ensure_ascii=False))
 
 
-def load_session() -> dict:
-    """Diske kaydedilmiş dosyaları session_state'e yükle. Döndürülen dict restored bilgisi içerir."""
+def clear_session():
+    st.session_state.pdf_bytes = None
+    st.session_state.sig_img_raw = None
+    st.session_state._restored = {}
+    if UPLOAD_DIR.exists():
+        shutil.rmtree(UPLOAD_DIR)
+    UPLOAD_DIR.mkdir(exist_ok=True)
+
+
+def load_session():
     restored = {}
     if st.session_state.pdf_bytes is None and LAST_PDF_PATH.exists():
         st.session_state.pdf_bytes = LAST_PDF_PATH.read_bytes()
@@ -106,12 +111,10 @@ def load_session() -> dict:
     return restored
 
 
-# ── Constants ─────────────────────────────────────────────────────────────────
 DPI = 150
 DISPLAY_WIDTH = 700
 NUDGE_PT = 5.0
 
-# ── Session state ─────────────────────────────────────────────────────────────
 _SESSION_DEFAULTS = {
     "pdf_bytes": None,
     "sig_img_raw": None,
@@ -130,13 +133,11 @@ for k, v in _SESSION_DEFAULTS.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# Sayfa yenilenince önceki dosyaları geri yükle
 if "session_loaded" not in st.session_state:
     st.session_state.session_loaded = True
     st.session_state._restored = load_session()
 
 
-# ── Validation helpers ────────────────────────────────────────────────────────
 def validate_pdf(pdf_bytes):
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -162,8 +163,7 @@ def validate_image(img_file):
         return False, None, "Corrupted image file."
 
 
-# ── UI helpers ────────────────────────────────────────────────────────────────
-def checkerboard_background(img: Image.Image, cell: int = 8) -> Image.Image:
+def checkerboard_background(img, cell=8):
     img = img.convert("RGBA")
     w, h = img.size
     bg = Image.new("RGB", (w, h))
@@ -176,8 +176,8 @@ def checkerboard_background(img: Image.Image, cell: int = 8) -> Image.Image:
     return bg
 
 
-def get_processed_signature() -> tuple[Image.Image, dict]:
-    info: dict = {}
+def get_processed_signature():
+    info = {}
     processed = process_signature_image(
         st.session_state.sig_img_raw,
         remove_background=st.session_state.remove_bg,
@@ -193,12 +193,7 @@ def get_processed_signature() -> tuple[Image.Image, dict]:
 
 def render_with_preview(page_img, sig_img, x_px, y_px, w_px, h_px, preserve_aspect=True):
     preview = page_img.copy().convert("RGBA")
-    sig = resize_signature_to_box(
-        sig_img,
-        max(1, int(w_px)),
-        max(1, int(h_px)),
-        preserve_aspect_ratio=preserve_aspect,
-    )
+    sig = resize_signature_to_box(sig_img, max(1, int(w_px)), max(1, int(h_px)), preserve_aspect_ratio=preserve_aspect)
     preview.paste(sig, (int(x_px), int(y_px)), sig)
     return preview.convert("RGB")
 
@@ -211,12 +206,9 @@ def place_signature_from_bytes(pdf_bytes, page_number, x_pt, y_pt, sig_img, widt
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
         sig_img.convert("RGBA").save(sig_path, format="PNG")
-        place_signature(
-            pdf_path, page_number, x_pt, y_pt, sig_path,
-            width=width_pt, height=height_pt,
-            preserve_aspect_ratio=preserve_aspect_ratio,
-            output_path=out_path,
-        )
+        place_signature(pdf_path, page_number, x_pt, y_pt, sig_path,
+                        width=width_pt, height=height_pt,
+                        preserve_aspect_ratio=preserve_aspect_ratio, output_path=out_path)
         with open(out_path, "rb") as f:
             return f.read()
 
@@ -231,8 +223,7 @@ def ensure_manual_placement(page_width_pt, page_height_pt, sig_w_pt, sig_h_pt):
         st.session_state.manual_x_pt, st.session_state.manual_y_pt = dx, dy
     x_pt, y_pt = clamp_signature_position(
         st.session_state.manual_x_pt, st.session_state.manual_y_pt,
-        page_width_pt, page_height_pt, sig_w_pt, sig_h_pt,
-    )
+        page_width_pt, page_height_pt, sig_w_pt, sig_h_pt)
     st.session_state.manual_x_pt = x_pt
     st.session_state.manual_y_pt = y_pt
 
@@ -270,6 +261,11 @@ with st.sidebar:
         else:
             st.session_state.sig_img_raw = img
             save_session(sig_img=img, sig_name=sig_file.name)
+
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+    if st.button("🗑 Clear Files"):
+        clear_session()
+        st.rerun()
 
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     st.markdown('<span class="sidebar-label">02 · Signature Processing</span>', unsafe_allow_html=True)
@@ -345,7 +341,6 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Restored session mesajı ───────────────────────────────────────────────────
 _restored = st.session_state.get("_restored", {})
 if _restored:
     meta = _restored.get("meta", {})
@@ -357,7 +352,6 @@ if _restored:
     if parts:
         st.markdown(f'<div class="msg msg-info">📂 Restored from last session: {" · ".join(parts)}</div>', unsafe_allow_html=True)
 
-# ── Guards ────────────────────────────────────────────────────────────────────
 if not st.session_state.pdf_bytes:
     st.markdown('<div class="msg msg-info">⬅ Upload a PDF document from the sidebar to get started.</div>', unsafe_allow_html=True)
     st.stop()
@@ -366,7 +360,6 @@ if not st.session_state.sig_img_raw:
     st.markdown('<div class="msg msg-info">⬅ Upload a signature image from the sidebar to continue.</div>', unsafe_allow_html=True)
     st.stop()
 
-# ── Load PDF ──────────────────────────────────────────────────────────────────
 try:
     doc = fitz.open(stream=st.session_state.pdf_bytes, filetype="pdf")
     total_pages = get_page_count(doc)
@@ -378,7 +371,6 @@ w_pt = st.session_state.sig_w_pt
 h_pt = st.session_state.sig_h_pt
 preserve = st.session_state.preserve_aspect
 
-# ── Process signature ─────────────────────────────────────────────────────────
 try:
     processed_sig, process_info = get_processed_signature()
 except Exception as exc:
@@ -390,7 +382,6 @@ if st.session_state.remove_bg:
     if (st.session_state.use_rembg and not rembg_is_available()) or process_info.get("rembg_failed"):
         st.markdown('<div class="msg msg-warning">rembg is not installed; using Pillow fallback.</div>', unsafe_allow_html=True)
 
-# ── Layout ────────────────────────────────────────────────────────────────────
 col_main, col_right = st.columns([3, 1], gap="large")
 
 with col_right:
@@ -398,14 +389,12 @@ with col_right:
     page_num = st.number_input("Go to page", 1, total_pages, st.session_state.page_number + 1, step=1, label_visibility="collapsed") - 1
     st.session_state.page_number = page_num
     st.caption(f"Page {st.session_state.page_number + 1} of {total_pages}")
-
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Processed Signature</div>', unsafe_allow_html=True)
     proc_thumb = processed_sig.copy()
     proc_thumb.thumbnail((200, 100))
     st.image(checkerboard_background(proc_thumb), width=200)
 
-# ── Render page ───────────────────────────────────────────────────────────────
 try:
     page_img = render_page(doc, st.session_state.page_number, dpi=DPI)
 except Exception:
@@ -418,7 +407,6 @@ page_rect = doc[st.session_state.page_number].rect
 with col_main:
     st.markdown('<div class="section-title">PDF Preview</div>', unsafe_allow_html=True)
 
-    # ── AUTO-DETECT ───────────────────────────────────────────────────────────
     if mode == "Auto-detect":
         try:
             areas = find_signature_areas(doc, st.session_state.page_number)
@@ -438,12 +426,10 @@ with col_main:
             y_pt_val = float(area["y"])
 
             try:
-                preview = render_with_preview(
-                    page_img, processed_sig,
-                    pt_to_px(x_pt_val, DPI), pt_to_px(y_pt_val, DPI),
-                    pt_to_px(w_pt, DPI), pt_to_px(h_pt, DPI),
-                    preserve_aspect=preserve,
-                )
+                preview = render_with_preview(page_img, processed_sig,
+                                              pt_to_px(x_pt_val, DPI), pt_to_px(y_pt_val, DPI),
+                                              pt_to_px(w_pt, DPI), pt_to_px(h_pt, DPI),
+                                              preserve_aspect=preserve)
                 st.image(preview, width=DISPLAY_WIDTH)
             except Exception:
                 st.image(page_img, width=DISPLAY_WIDTH)
@@ -455,14 +441,12 @@ with col_main:
                         signed = place_signature_from_bytes(
                             st.session_state.pdf_bytes, st.session_state.page_number,
                             x_pt_val, y_pt_val, processed_sig, w_pt, h_pt,
-                            preserve_aspect_ratio=preserve,
-                        )
+                            preserve_aspect_ratio=preserve)
                     st.markdown('<div class="msg msg-success">✔ Signature placed successfully.</div>', unsafe_allow_html=True)
                     st.download_button("⬇ DOWNLOAD SIGNED PDF", data=signed, file_name="signed_document.pdf", mime="application/pdf")
                 except Exception as exc:
                     st.markdown(f'<div class="msg msg-error">❌ Failed to sign PDF: {exc}</div>', unsafe_allow_html=True)
 
-    # ── MANUAL ────────────────────────────────────────────────────────────────
     else:
         page_w = float(page_rect.width)
         page_h = float(page_rect.height)
@@ -474,12 +458,10 @@ with col_main:
         y_pt_val = float(st.session_state.manual_y_pt)
 
         try:
-            preview = render_with_preview(
-                page_img, processed_sig,
-                pt_to_px(x_pt_val, DPI), pt_to_px(y_pt_val, DPI),
-                pt_to_px(w_pt, DPI), pt_to_px(h_pt, DPI),
-                preserve_aspect=preserve,
-            )
+            preview = render_with_preview(page_img, processed_sig,
+                                          pt_to_px(x_pt_val, DPI), pt_to_px(y_pt_val, DPI),
+                                          pt_to_px(w_pt, DPI), pt_to_px(h_pt, DPI),
+                                          preserve_aspect=preserve)
         except Exception:
             preview = page_img
 
@@ -494,8 +476,7 @@ with col_main:
                     float(click["x"]), float(click["y"]),
                     DISPLAY_WIDTH, display_height,
                     page_img.width, page_img.height,
-                    w_pt, h_pt, page_w, page_h, dpi=DPI,
-                )
+                    w_pt, h_pt, page_w, page_h, dpi=DPI)
                 set_manual_placement(new_x, new_y, page_w, page_h, w_pt, h_pt)
                 st.rerun()
 
@@ -545,8 +526,7 @@ with col_main:
                     signed = place_signature_from_bytes(
                         st.session_state.pdf_bytes, st.session_state.page_number,
                         x_pt_val, y_pt_val, processed_sig, w_pt, h_pt,
-                        preserve_aspect_ratio=preserve,
-                    )
+                        preserve_aspect_ratio=preserve)
                 st.markdown('<div class="msg msg-success">✔ Signature placed successfully.</div>', unsafe_allow_html=True)
                 st.download_button("⬇ DOWNLOAD SIGNED PDF", data=signed, file_name="signed_document.pdf", mime="application/pdf")
             except Exception as exc:
