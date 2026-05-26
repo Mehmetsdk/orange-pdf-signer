@@ -1,6 +1,7 @@
 streamlit
 streamlit-image-coordinates
+streamlit-drawable-canvas
 PyMuPDF
 Pillow
-rembg
+numpy
 pytest
