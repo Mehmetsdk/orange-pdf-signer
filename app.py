@@ -38,6 +38,13 @@ from helpers import (
     set_manual_placement,
 )
 
+import io as _io
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _fetch_r2_file(key: str) -> bytes | None:
+    """Download a file from R2 and cache the result for 60 seconds."""
+    return download_file(key)
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 DPI           = 150
 DISPLAY_WIDTH = 700
@@ -107,23 +114,25 @@ with st.sidebar:
     sig_file = st.file_uploader("Signature Image (PNG/JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed",
                                 key=f"sig_uploader_{st.session_state.uploader_version}")
     if sig_file:
-        import io as _io
-        sig_bytes = sig_file.read()
-        is_valid, img, err = validate_image(_io.BytesIO(sig_bytes))
-        if not is_valid:
-            st.markdown(f'<div class="msg msg-error">❌ {err}</div>', unsafe_allow_html=True)
-            st.session_state.sig_img_raw = None
-        else:
-            st.session_state.sig_img_raw = img
-            save_session(sig_img=img, sig_name=sig_file.name)
-            if r2_is_configured():
-                ok, msg = upload_signature(
-                    st.session_state.get("username", "anonymous"),
-                    sig_bytes,
-                    sig_file.name,
-                )
-                if not ok:
-                    st.sidebar.warning(f"R2 upload: {msg}")
+        _sig_key = f"{sig_file.name}_{sig_file.size}"
+        if st.session_state.get("_sig_upload_key") != _sig_key:
+            st.session_state._sig_upload_key = _sig_key
+            sig_bytes = sig_file.read()
+            is_valid, img, err = validate_image(_io.BytesIO(sig_bytes))
+            if not is_valid:
+                st.markdown(f'<div class="msg msg-error">❌ {err}</div>', unsafe_allow_html=True)
+                st.session_state.sig_img_raw = None
+            else:
+                st.session_state.sig_img_raw = img
+                save_session(sig_img=img, sig_name=sig_file.name)
+                if r2_is_configured():
+                    ok, msg = upload_signature(
+                        st.session_state.get("username", "anonymous"),
+                        sig_bytes,
+                        sig_file.name,
+                    )
+                    if not ok:
+                        st.sidebar.warning(f"R2 upload: {msg}")
 
     # ── Draw your signature ───────────────────────────────────────────────────
     with st.expander("✏️ Draw your signature"):
@@ -218,6 +227,66 @@ with st.sidebar:
         thumb.thumbnail((200, 100))
         st.image(checkerboard_background(thumb), width=200)
 
+    # ── 05 · My Files (R2) ───────────────────────────────────────────────────
+    if r2_is_configured():
+        st.markdown('<hr class="divider">', unsafe_allow_html=True)
+        st.markdown('<span class="sidebar-label">05 · My Files</span>', unsafe_allow_html=True)
+        _uname = st.session_state.get("username", "anonymous")
+        _tab_sig, _tab_pdf, _tab_signed = st.tabs(["✍️ Sigs", "📄 PDFs", "✅ Signed"])
+
+        with _tab_sig:
+            _sigs = list_user_files(_uname, "signatures")
+            if not _sigs:
+                st.caption("No signatures yet.")
+            for _f in _sigs:
+                _data = _fetch_r2_file(_f["key"])
+                _col_thumb, _col_info = st.columns([1, 2])
+                with _col_thumb:
+                    if _data:
+                        try:
+                            _t = Image.open(_io.BytesIO(_data)).convert("RGBA")
+                            _t.thumbnail((60, 40))
+                            st.image(checkerboard_background(_t), width=60)
+                        except Exception:
+                            st.caption("?")
+                with _col_info:
+                    st.caption(_f["name"])
+                    st.markdown(f'<span style="font-size:0.7rem;color:#666;">{max(1,_f["size"]//1024)} KB</span>', unsafe_allow_html=True)
+                    _c1, _c2 = st.columns(2)
+                    with _c1:
+                        if st.button("✔ Use", key=f"use_{_f['key']}"):
+                            if _data:
+                                _loaded = Image.open(_io.BytesIO(_data)).convert("RGBA")
+                                st.session_state.sig_img_raw = _loaded
+                                st.session_state._sig_upload_key = "__r2__"
+                                save_session(sig_img=_loaded, sig_name=_f["name"])
+                                st.rerun()
+                    with _c2:
+                        if _data:
+                            st.download_button("⬇", data=_data, file_name=_f["name"],
+                                               mime="image/png", key=f"dl_{_f['key']}")
+                st.markdown("---")
+
+        def _sidebar_pdf_tab(tab, category):
+            with tab:
+                _files = list_user_files(_uname, category)
+                if not _files:
+                    st.caption("No files yet.")
+                for _f in _files:
+                    _data = _fetch_r2_file(_f["key"])
+                    _ca, _cb = st.columns([3, 1])
+                    with _ca:
+                        st.caption(_f["name"])
+                        st.markdown(f'<span style="font-size:0.7rem;color:#666;">{max(1,_f["size"]//1024)} KB</span>', unsafe_allow_html=True)
+                    with _cb:
+                        if _data:
+                            st.download_button("⬇", data=_data, file_name=_f["name"],
+                                               mime="application/pdf", key=f"dl_{_f['key']}")
+                    st.markdown("---")
+
+        _sidebar_pdf_tab(_tab_pdf,    "pdfs")
+        _sidebar_pdf_tab(_tab_signed, "signed_pdfs")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # HEADER
@@ -300,78 +369,6 @@ with col_right:
     proc_thumb.thumbnail((200, 100))
     st.image(checkerboard_background(proc_thumb), width=200)
 
-    # ── My Files (R2) ─────────────────────────────────────────────────────────
-    if r2_is_configured():
-        import io as _io
-
-        st.markdown('<hr class="divider">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">My Files</div>', unsafe_allow_html=True)
-        _username = st.session_state.get("username", "anonymous")
-
-        @st.cache_data(ttl=60, show_spinner=False)
-        def _fetch(key: str) -> bytes | None:
-            return download_file(key)
-
-        _tab_sig, _tab_pdf, _tab_signed = st.tabs(["✍️ Sigs", "📄 PDFs", "✅ Signed"])
-
-        # ── Signatures tab ────────────────────────────────────────────────────
-        with _tab_sig:
-            _sigs = list_user_files(_username, "signatures")
-            if not _sigs:
-                st.caption("No signatures yet.")
-            for _f in _sigs:
-                _data = _fetch(_f["key"])
-                _col_thumb, _col_info = st.columns([1, 2])
-                with _col_thumb:
-                    if _data:
-                        try:
-                            _thumb = Image.open(_io.BytesIO(_data)).convert("RGBA")
-                            _thumb.thumbnail((60, 40))
-                            st.image(checkerboard_background(_thumb), width=60)
-                        except Exception:
-                            st.caption("?")
-                with _col_info:
-                    st.caption(_f["name"])
-                    st.markdown(
-                        f'<span style="font-size:0.7rem;color:#666;">{max(1,_f["size"]//1024)} KB</span>',
-                        unsafe_allow_html=True,
-                    )
-                    _c1, _c2 = st.columns(2)
-                    with _c1:
-                        if st.button("✔ Use", key=f"use_{_f['key']}"):
-                            if _data:
-                                _loaded = Image.open(_io.BytesIO(_data)).convert("RGBA")
-                                st.session_state.sig_img_raw = _loaded
-                                st.rerun()
-                    with _c2:
-                        if _data:
-                            st.download_button("⬇", data=_data, file_name=_f["name"],
-                                               mime="image/png", key=f"dl_{_f['key']}")
-                st.markdown("---")
-
-        # ── PDFs tab ──────────────────────────────────────────────────────────
-        def _pdf_tab(tab, category):
-            with tab:
-                _files = list_user_files(_username, category)
-                if not _files:
-                    st.caption("No files yet.")
-                for _f in _files:
-                    _data = _fetch(_f["key"])
-                    _ca, _cb = st.columns([3, 1])
-                    with _ca:
-                        st.caption(_f["name"])
-                        st.markdown(
-                            f'<span style="font-size:0.7rem;color:#666;">{max(1,_f["size"]//1024)} KB</span>',
-                            unsafe_allow_html=True,
-                        )
-                    with _cb:
-                        if _data:
-                            st.download_button("⬇", data=_data, file_name=_f["name"],
-                                               mime="application/pdf", key=f"dl_{_f['key']}")
-                    st.markdown("---")
-
-        _pdf_tab(_tab_pdf,    "pdfs")
-        _pdf_tab(_tab_signed, "signed_pdfs")
 
 # ── Render current page ───────────────────────────────────────────────────────
 try:
