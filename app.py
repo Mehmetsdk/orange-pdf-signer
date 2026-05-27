@@ -25,6 +25,7 @@ from pdf_backend import (
 from styles import APP_CSS
 from session_manager import init_session, save_session, clear_session
 from auth import render_auth_ui
+from storage import upload_signature, upload_signed_pdf, r2_is_configured
 from helpers import (
     validate_pdf,
     validate_image,
@@ -98,13 +99,23 @@ with st.sidebar:
     st.caption("✍️ Signature Image")
     sig_file = st.file_uploader("Signature Image (PNG/JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
     if sig_file:
-        is_valid, img, err = validate_image(sig_file)
+        import io as _io
+        sig_bytes = sig_file.read()
+        is_valid, img, err = validate_image(_io.BytesIO(sig_bytes))
         if not is_valid:
             st.markdown(f'<div class="msg msg-error">❌ {err}</div>', unsafe_allow_html=True)
             st.session_state.sig_img_raw = None
         else:
             st.session_state.sig_img_raw = img
             save_session(sig_img=img, sig_name=sig_file.name)
+            if r2_is_configured():
+                ok, msg = upload_signature(
+                    st.session_state.get("username", "anonymous"),
+                    sig_bytes,
+                    sig_file.name,
+                )
+                if not ok:
+                    st.sidebar.warning(f"R2 upload: {msg}")
 
     # ── Draw your signature ───────────────────────────────────────────────────
     with st.expander("✏️ Draw your signature"):
@@ -337,6 +348,17 @@ with col_main:
                             preserve_aspect_ratio=preserve,
                         )
                     st.markdown('<div class="msg msg-success">✔ Signature placed successfully.</div>', unsafe_allow_html=True)
+                    if r2_is_configured():
+                        pdf_name = st.session_state.get("_meta", {}).get("pdf_name", "signed_document.pdf")
+                        ok, r2_key = upload_signed_pdf(
+                            st.session_state.get("username", "anonymous"),
+                            signed,
+                            f"signed_{pdf_name}",
+                        )
+                        if ok:
+                            st.markdown(f'<div class="msg msg-info">☁ Saved to cloud: {r2_key}</div>', unsafe_allow_html=True)
+                        else:
+                            st.warning(f"R2 upload: {r2_key}")
                     st.download_button("⬇ DOWNLOAD SIGNED PDF", data=signed, file_name="signed_document.pdf", mime="application/pdf")
                 except Exception as exc:
                     st.markdown(f'<div class="msg msg-error">❌ Failed to sign PDF: {exc}</div>', unsafe_allow_html=True)
@@ -425,6 +447,17 @@ with col_main:
                         preserve_aspect_ratio=preserve,
                     )
                 st.markdown('<div class="msg msg-success">✔ Signature placed successfully.</div>', unsafe_allow_html=True)
+                if r2_is_configured():
+                    pdf_name = st.session_state.get("_meta", {}).get("pdf_name", "signed_document.pdf")
+                    ok, r2_key = upload_signed_pdf(
+                        st.session_state.get("username", "anonymous"),
+                        signed,
+                        f"signed_{pdf_name}",
+                    )
+                    if ok:
+                        st.markdown(f'<div class="msg msg-info">☁ Saved to cloud: {r2_key}</div>', unsafe_allow_html=True)
+                    else:
+                        st.warning(f"R2 upload: {r2_key}")
                 st.download_button("⬇ DOWNLOAD SIGNED PDF", data=signed, file_name="signed_document.pdf", mime="application/pdf")
             except Exception as exc:
                 st.markdown(f'<div class="msg msg-error">❌ Failed to sign PDF: {exc}</div>', unsafe_allow_html=True)
