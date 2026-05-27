@@ -37,6 +37,7 @@ SESSION_DEFAULTS: dict = {
     "trim_edges":      True,
     "preserve_aspect": True,
     "canvas_version":  0,
+    "uploader_version": 0,
 }
 
 
@@ -90,9 +91,10 @@ def load_session() -> dict:
 
 def clear_session() -> None:
     """Wipe session state and delete all files saved to disk."""
-    st.session_state.pdf_bytes    = None
-    st.session_state.sig_img_raw  = None
-    st.session_state._restored    = {}
+    st.session_state.pdf_bytes      = None
+    st.session_state.sig_img_raw    = None
+    st.session_state._restored      = {}
+    st.session_state.uploader_version += 1  # forces file uploader widgets to reset
 
     if UPLOAD_DIR.exists():
         shutil.rmtree(UPLOAD_DIR)

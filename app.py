@@ -84,7 +84,8 @@ with st.sidebar:
     st.markdown('<span class="sidebar-label">01 · Files</span>', unsafe_allow_html=True)
 
     st.caption("📄 PDF Document")
-    pdf_file = st.file_uploader("PDF Document", type=["pdf"], label_visibility="collapsed")
+    pdf_file = st.file_uploader("PDF Document", type=["pdf"], label_visibility="collapsed",
+                                key=f"pdf_uploader_{st.session_state.uploader_version}")
     if pdf_file:
         raw = pdf_file.read()
         is_valid, err = validate_pdf(raw)
@@ -103,7 +104,8 @@ with st.sidebar:
                 )
 
     st.caption("✍️ Signature Image")
-    sig_file = st.file_uploader("Signature Image (PNG/JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+    sig_file = st.file_uploader("Signature Image (PNG/JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed",
+                                key=f"sig_uploader_{st.session_state.uploader_version}")
     if sig_file:
         import io as _io
         sig_bytes = sig_file.read()
