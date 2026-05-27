@@ -5,3 +5,5 @@ PyMuPDF
 Pillow
 numpy
 pytest
+psycopg2-binary
+bcrypt

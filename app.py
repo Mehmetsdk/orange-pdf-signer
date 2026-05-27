@@ -24,6 +24,7 @@ from pdf_backend import (
 )
 from styles import APP_CSS
 from session_manager import init_session, save_session, clear_session
+from auth import render_auth_ui
 from helpers import (
     validate_pdf,
     validate_image,
@@ -51,6 +52,27 @@ st.set_page_config(
 st.markdown(APP_CSS, unsafe_allow_html=True)
 init_session()
 
+
+# ── Auth check ────────────────────────────────────────────────────────────────
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
+
+with st.sidebar:
+    st.markdown('<span class="sidebar-label">00 · Account</span>', unsafe_allow_html=True)
+    is_logged_in = render_auth_ui()
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
+if not st.session_state.logged_in:
+    st.markdown("""
+    <div class="app-header">
+        <div><div class="app-logo">PDF <span>Signer</span></div></div>
+        <div class="app-subtitle">ATA Builders Lab &nbsp;·&nbsp; Document Signing Tool</div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('<div class="msg msg-info">⬅ Please log in or register from the sidebar to use the app.</div>', unsafe_allow_html=True)
+    st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
