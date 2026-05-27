@@ -302,39 +302,76 @@ with col_right:
 
     # ── My Files (R2) ─────────────────────────────────────────────────────────
     if r2_is_configured():
+        import io as _io
+
         st.markdown('<hr class="divider">', unsafe_allow_html=True)
         st.markdown('<div class="section-title">My Files</div>', unsafe_allow_html=True)
         _username = st.session_state.get("username", "anonymous")
 
-        _tab_sig, _tab_pdf, _tab_signed = st.tabs(["✍️ Signatures", "📄 PDFs", "✅ Signed"])
+        @st.cache_data(ttl=60, show_spinner=False)
+        def _fetch(key: str) -> bytes | None:
+            return download_file(key)
 
-        def _file_list(tab, category, mime):
+        _tab_sig, _tab_pdf, _tab_signed = st.tabs(["✍️ Sigs", "📄 PDFs", "✅ Signed"])
+
+        # ── Signatures tab ────────────────────────────────────────────────────
+        with _tab_sig:
+            _sigs = list_user_files(_username, "signatures")
+            if not _sigs:
+                st.caption("No signatures yet.")
+            for _f in _sigs:
+                _data = _fetch(_f["key"])
+                _col_thumb, _col_info = st.columns([1, 2])
+                with _col_thumb:
+                    if _data:
+                        try:
+                            _thumb = Image.open(_io.BytesIO(_data)).convert("RGBA")
+                            _thumb.thumbnail((60, 40))
+                            st.image(checkerboard_background(_thumb), width=60)
+                        except Exception:
+                            st.caption("?")
+                with _col_info:
+                    st.caption(_f["name"])
+                    st.markdown(
+                        f'<span style="font-size:0.7rem;color:#666;">{max(1,_f["size"]//1024)} KB</span>',
+                        unsafe_allow_html=True,
+                    )
+                    _c1, _c2 = st.columns(2)
+                    with _c1:
+                        if st.button("✔ Use", key=f"use_{_f['key']}"):
+                            if _data:
+                                _loaded = Image.open(_io.BytesIO(_data)).convert("RGBA")
+                                st.session_state.sig_img_raw = _loaded
+                                st.rerun()
+                    with _c2:
+                        if _data:
+                            st.download_button("⬇", data=_data, file_name=_f["name"],
+                                               mime="image/png", key=f"dl_{_f['key']}")
+                st.markdown("---")
+
+        # ── PDFs tab ──────────────────────────────────────────────────────────
+        def _pdf_tab(tab, category):
             with tab:
-                files = list_user_files(_username, category)
-                if not files:
+                _files = list_user_files(_username, category)
+                if not _files:
                     st.caption("No files yet.")
-                else:
-                    for f in files:
-                        size_kb = f["size"] // 1024 or 1
-                        col_a, col_b = st.columns([3, 2])
-                        with col_a:
-                            st.caption(f["name"])
-                            st.markdown(f'<span style="font-size:0.7rem;color:#555;">{size_kb} KB</span>', unsafe_allow_html=True)
-                        with col_b:
-                            if st.button("⬇", key=f"dl_{f['key']}"):
-                                data = download_file(f["key"])
-                                if data:
-                                    st.download_button(
-                                        "Save",
-                                        data=data,
-                                        file_name=f["name"],
-                                        mime=mime,
-                                        key=f"save_{f['key']}",
-                                    )
+                for _f in _files:
+                    _data = _fetch(_f["key"])
+                    _ca, _cb = st.columns([3, 1])
+                    with _ca:
+                        st.caption(_f["name"])
+                        st.markdown(
+                            f'<span style="font-size:0.7rem;color:#666;">{max(1,_f["size"]//1024)} KB</span>',
+                            unsafe_allow_html=True,
+                        )
+                    with _cb:
+                        if _data:
+                            st.download_button("⬇", data=_data, file_name=_f["name"],
+                                               mime="application/pdf", key=f"dl_{_f['key']}")
+                    st.markdown("---")
 
-        _file_list(_tab_sig,    "signatures",  "image/png")
-        _file_list(_tab_pdf,    "pdfs",        "application/pdf")
-        _file_list(_tab_signed, "signed_pdfs", "application/pdf")
+        _pdf_tab(_tab_pdf,    "pdfs")
+        _pdf_tab(_tab_signed, "signed_pdfs")
 
 # ── Render current page ───────────────────────────────────────────────────────
 try:
