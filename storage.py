@@ -65,6 +65,30 @@ def upload_signature(username: str, file_bytes: bytes, filename: str) -> tuple[b
         return False, f"Unexpected error: {e}"
 
 
+def upload_pdf(username: str, file_bytes: bytes, filename: str) -> tuple[bool, str]:
+    """
+    Upload an original PDF document to R2.
+    Stored at: pdfs/{username}/{filename}
+    Returns (success, message_or_key).
+    """
+    key = f"pdfs/{username}/{filename}"
+    try:
+        client = _get_client()
+        client.put_object(
+            Bucket=_bucket(),
+            Key=key,
+            Body=io.BytesIO(file_bytes),
+            ContentType="application/pdf",
+        )
+        return True, key
+    except NoCredentialsError:
+        return False, "R2 credentials are missing or invalid."
+    except ClientError as e:
+        return False, f"R2 upload error: {e}"
+    except Exception as e:
+        return False, f"Unexpected error: {e}"
+
+
 def upload_signed_pdf(username: str, file_bytes: bytes, filename: str) -> tuple[bool, str]:
     """
     Upload a signed PDF to R2.

@@ -25,7 +25,7 @@ from pdf_backend import (
 from styles import APP_CSS
 from session_manager import init_session, save_session, clear_session
 from auth import render_auth_ui
-from storage import upload_signature, upload_signed_pdf, r2_is_configured
+from storage import upload_signature, upload_signed_pdf, upload_pdf, r2_is_configured
 from helpers import (
     validate_pdf,
     validate_image,
@@ -95,6 +95,12 @@ with st.sidebar:
             st.session_state.pdf_bytes = raw
             st.session_state.page_number = 0
             save_session(pdf_bytes=raw, pdf_name=pdf_file.name)
+            if r2_is_configured():
+                upload_pdf(
+                    st.session_state.get("username", "anonymous"),
+                    raw,
+                    pdf_file.name,
+                )
 
     st.caption("✍️ Signature Image")
     sig_file = st.file_uploader("Signature Image (PNG/JPG)", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
