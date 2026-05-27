@@ -26,12 +26,13 @@ _COOKIE_DAYS   = 30
 _SECRET        = os.environ.get("SECRET_KEY", "pdf-signer-secret-key-change-me")
 
 
-@st.cache_resource
 def _cookie_manager():
-    """Return a singleton CookieManager (cached to avoid re-instantiation)."""
+    """Return a CookieManager instance stored in session_state."""
     if not _COOKIES_AVAILABLE:
         return None
-    return stx.CookieManager()
+    if "_cm" not in st.session_state:
+        st.session_state._cm = stx.CookieManager()
+    return st.session_state._cm
 
 
 def _make_token(username: str) -> str:

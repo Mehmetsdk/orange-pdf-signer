@@ -24,7 +24,7 @@ from pdf_backend import (
 )
 from styles import APP_CSS
 from session_manager import init_session, save_session, clear_session
-from auth import render_auth_ui, _cookie_manager
+from auth import render_auth_ui
 from storage import upload_signature, upload_signed_pdf, upload_pdf, r2_is_configured, list_user_files, download_file
 from helpers import (
     validate_pdf,
@@ -52,7 +52,6 @@ st.set_page_config(
 )
 st.markdown(APP_CSS, unsafe_allow_html=True)
 init_session()
-_cookie_manager()  # initialise cookie manager early (must run before other widgets)
 
 
 # ── Auth check ────────────────────────────────────────────────────────────────
