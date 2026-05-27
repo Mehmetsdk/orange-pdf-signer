@@ -25,7 +25,7 @@ from pdf_backend import (
 from styles import APP_CSS
 from session_manager import init_session, save_session, clear_session
 from auth import render_auth_ui
-from storage import upload_signature, upload_signed_pdf, upload_pdf, r2_is_configured
+from storage import upload_signature, upload_signed_pdf, upload_pdf, r2_is_configured, list_user_files, download_file
 from helpers import (
     validate_pdf,
     validate_image,
@@ -299,6 +299,42 @@ with col_right:
     proc_thumb = processed_sig.copy()
     proc_thumb.thumbnail((200, 100))
     st.image(checkerboard_background(proc_thumb), width=200)
+
+    # ── My Files (R2) ─────────────────────────────────────────────────────────
+    if r2_is_configured():
+        st.markdown('<hr class="divider">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">My Files</div>', unsafe_allow_html=True)
+        _username = st.session_state.get("username", "anonymous")
+
+        _tab_sig, _tab_pdf, _tab_signed = st.tabs(["✍️ Signatures", "📄 PDFs", "✅ Signed"])
+
+        def _file_list(tab, category, mime):
+            with tab:
+                files = list_user_files(_username, category)
+                if not files:
+                    st.caption("No files yet.")
+                else:
+                    for f in files:
+                        size_kb = f["size"] // 1024 or 1
+                        col_a, col_b = st.columns([3, 2])
+                        with col_a:
+                            st.caption(f["name"])
+                            st.markdown(f'<span style="font-size:0.7rem;color:#555;">{size_kb} KB</span>', unsafe_allow_html=True)
+                        with col_b:
+                            if st.button("⬇", key=f"dl_{f['key']}"):
+                                data = download_file(f["key"])
+                                if data:
+                                    st.download_button(
+                                        "Save",
+                                        data=data,
+                                        file_name=f["name"],
+                                        mime=mime,
+                                        key=f"save_{f['key']}",
+                                    )
+
+        _file_list(_tab_sig,    "signatures",  "image/png")
+        _file_list(_tab_pdf,    "pdfs",        "application/pdf")
+        _file_list(_tab_signed, "signed_pdfs", "application/pdf")
 
 # ── Render current page ───────────────────────────────────────────────────────
 try:

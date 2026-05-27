@@ -113,6 +113,45 @@ def upload_signed_pdf(username: str, file_bytes: bytes, filename: str) -> tuple[
         return False, f"Unexpected error: {e}"
 
 
+def list_user_files(username: str, category: str) -> list[dict]:
+    """
+    List files for a user in the given category folder.
+    category: 'signatures' | 'pdfs' | 'signed_pdfs'
+    Returns list of dicts with keys: name, key, size, last_modified.
+    """
+    prefix = f"{category}/{username}/"
+    try:
+        client = _get_client()
+        resp = client.list_objects_v2(Bucket=_bucket(), Prefix=prefix)
+        items = []
+        for obj in resp.get("Contents", []):
+            key = obj["Key"]
+            name = key[len(prefix):]  # strip prefix to get just the filename
+            if not name:
+                continue
+            items.append({
+                "name": name,
+                "key": key,
+                "size": obj.get("Size", 0),
+                "last_modified": obj.get("LastModified"),
+            })
+        # newest first
+        items.sort(key=lambda x: x["last_modified"] or "", reverse=True)
+        return items
+    except Exception:
+        return []
+
+
+def download_file(key: str) -> bytes | None:
+    """Download a file from R2 by its key. Returns bytes or None on error."""
+    try:
+        client = _get_client()
+        resp = client.get_object(Bucket=_bucket(), Key=key)
+        return resp["Body"].read()
+    except Exception:
+        return None
+
+
 def r2_is_configured() -> bool:
     """Return True if all R2 environment variables are set."""
     return all([
