@@ -8,3 +8,4 @@ pytest
 psycopg2-binary
 bcrypt
 boto3
+extra-streamlit-components
